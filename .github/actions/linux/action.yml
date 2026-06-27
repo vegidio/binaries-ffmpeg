@@ -18,7 +18,7 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y nasm yasm pkg-config autoconf autoconf-archive automake libtool libgl1-mesa-dev libva-dev
+        sudo apt-get install -y nasm yasm pkg-config autoconf autoconf-archive automake libtool libltdl-dev libgl1-mesa-dev libva-dev
         mkdir -p $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib
         mkdir -p $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/lib
         mkdir -p $GITHUB_WORKSPACE/vcpkg_cache
@@ -40,7 +40,16 @@ runs:
       env:
         VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
       run: |
-        FEATURES="all-gpl,openssl,drawtext,vaapi,zmq,dvdvideo"
+        # Curated feature list (the all-gpl meta-feature pulls ports that cannot
+        # build across all triplets: tensorflow, tesseract, modplug, openmpt).
+        # BASE = features supported on every triplet; the rest are gated per the
+        # same platform rules vcpkg's `all`/`all-gpl` meta-features use.
+        BASE="gpl,sdl2,aom,avcodec,avdevice,avfilter,avformat,bzip2,freetype,iconv,lzma,mp3lame,openjpeg,opus,snappy,soxr,speex,swresample,swscale,theora,twolame,vorbis,vpx,vulkan,webp,xml2,zlib,openssl,drawtext,zmq,dvdvideo,ass,fontconfig,fribidi,openh264,srt,dav1d,ilbc"
+        FEATURES="$BASE,alsa,vaapi,amf,opencl,opengl,nvcodec,x264,x265"
+        if [ "${{ inputs.arch }}" = "x64" ]; then
+          # ssh: vcpkg port is unsupported on arm; qsv: x64-only
+          FEATURES="$FEATURES,ssh,qsv"
+        fi
         ./builder/vcpkg install "ffmpeg[$FEATURES]:${{ inputs.triplet }}"
         ./builder/vcpkg install "ffmpeg[$FEATURES]:${{ inputs.triplet }}-dynamic"
 

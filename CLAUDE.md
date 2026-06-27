@@ -40,35 +40,42 @@ Artifact/zip naming (kept identical to avif): `static_<os>_<arch>.zip` /
 - **vcpkg is pinned to `2026.06.24`** (FFmpeg **8.1.2**) in every action's cache
   key, comment header, and `git clone --branch`. Bump all of them together to
   upgrade.
-- **Feature set:** `ffmpeg[all-gpl,openssl,drawtext,vaapi,zmq,dvdvideo]`.
-  - `vaapi` is **Linux-only** (`supports: linux`, a Linux-only HW-accel API) — it
-    is omitted from the macOS and Windows feature strings, or vcpkg errors out.
-  - `rubberband` was **removed from all OSes** to keep the produced library set
-    uniform: its port is unsupported on `windows & static`, and a feature present
-    on some platforms but not others is inconsistent for downstream consumers.
-  - Lesson: an explicitly-named feature that doesn't `support` a triplet aborts the
-    whole vcpkg plan, unlike features pulled transitively by the platform-guarded
-    `all-gpl` meta-feature. Explicit extras must build on **every** target triplet.
+- **Feature set:** an **explicit curated list** per triplet (NOT the `all-gpl`
+  meta-feature). Each action defines a `BASE` of always-supported features and
+  appends platform-gated ones, replicating vcpkg's own `all`/`all-gpl` guards.
+  - Why not `all-gpl`: it transitively pulls ports that can't build across all 6
+    triplets (`tensorflow`, `tesseract`, `modplug`, `openmpt`→`mpg123`) and a
+    meta-feature gives **no way to exclude individual ports**. So we list features
+    explicitly instead. See the `feature-set-decisions` memory.
+  - **Per-triplet gating** (must stay correct — an explicitly-named feature that a
+    triplet doesn't `support` aborts the whole vcpkg plan):
+    - `alsa`, `vaapi` → Linux only.
+    - `amf`, `opencl` → not macOS.
+    - `opengl`, `nvcodec` → not Windows-ARM (nvcodec also not macOS).
+    - `ssh` → x64 only (port unsupported on arm).
+    - `qsv` → x64 + (Linux|Windows) only.
+    - `x264`, `x265` → not Windows-ARM.
+    - `avisynthplus` → Windows-x64-dynamic only.
+  - **Excluded:** `tensorflow`, `tesseract`, `modplug`, `openmpt` (won't build —
+    user-approved), `fdk-aac` (nonfree/HE-AAC → non-redistributable), `avresample`
+    (removed from FFmpeg in 5.0), and the apps (libraries only).
   - `openssl` transitively enables `version3` (`--enable-version3`). With `gpl`
     enabled, OpenSSL ≥3.0 *requires* version3 (FFmpeg's `configure` dies
     otherwise). Result: license `GPL version 3 or later` → **redistributable**.
-  - Intentionally **excluded:** `fdk-aac` (nonfree/HE-AAC → non-redistributable),
-    `avresample` (removed from FFmpeg in 5.0), and the `ffmpeg`/`ffplay`/`ffprobe`
-    apps (libraries only).
+  - `libxcrypt` (a transitive Linux dep) needs the system package `libltdl-dev`,
+    installed by the Linux action.
 - **Static libs are `.a` on every OS** (MinGW on Windows, not MSVC `.lib`).
 
 ## Known risks / first-run gotchas
 
-- `all-gpl` transitively pulls **`tensorflow`** (into `x64-*-dynamic`) and
-  **`tesseract`** (into all dynamic triplets) — both heavy and the most likely to
-  fail or exceed CI time. If they break, the fallback is to replace `[all-gpl]`
-  with an explicit curated feature list excluding them.
+- Adding a new feature to the curated list means checking its `supports`/platform
+  constraints first — an unsupported explicit feature aborts the whole vcpkg plan.
 - Several vcpkg ports (`alsa` on Linux, `gperf` on macOS) build from source via
   autotools, so both actions install `autoconf autoconf-archive automake libtool`
   (`apt` / `brew`). On **Windows**, vcpkg fetches its own autotools via msys — no
   package change needed. vcpkg prints the exact missing program/package on
   failure — expand the install list from the error.
-- `arm64-mingw` (Windows ARM) is the least-tested FFmpeg target; vcpkg's platform
-  guards auto-drop unsupported features (e.g. x264/x265 on Windows ARM).
+- `arm64-mingw` (Windows ARM) is the least-tested FFmpeg target; its curated list
+  is the smallest (no ssh/opengl/nvcodec/qsv/x264/x265).
 - The `actions/cache@v4` vcpkg binary cache makes cold builds (which compile
   x264/x265/aom/etc.) tolerable on re-runs.

@@ -51,10 +51,20 @@ runs:
         MSYS2_PATH_TYPE: inherit
         VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
       run: |
-        # vaapi is Linux-only, so it is omitted from the Windows feature set.
-        FEATURES="all-gpl,openssl,drawtext,zmq,dvdvideo"
-        ./builder/vcpkg install "ffmpeg[$FEATURES]:${{ inputs.triplet-prefix }}-static"
-        ./builder/vcpkg install "ffmpeg[$FEATURES]:${{ inputs.triplet-prefix }}-dynamic"
+        # Curated feature list (the all-gpl meta-feature pulls ports that cannot
+        # build across all triplets: tensorflow, tesseract, modplug, openmpt).
+        # Windows-ARM drops ssh/opengl/nvcodec/qsv/x264/x265 (unsupported there);
+        # avisynthplus is only valid on windows-x64-dynamic.
+        BASE="gpl,sdl2,aom,avcodec,avdevice,avfilter,avformat,bzip2,freetype,iconv,lzma,mp3lame,openjpeg,opus,snappy,soxr,speex,swresample,swscale,theora,twolame,vorbis,vpx,vulkan,webp,xml2,zlib,openssl,drawtext,zmq,dvdvideo,ass,fontconfig,fribidi,openh264,srt,dav1d,ilbc"
+        if [ "${{ inputs.arch }}" = "x64" ]; then
+          STATIC="$BASE,ssh,amf,opencl,opengl,nvcodec,qsv,x264,x265"
+          DYNAMIC="$STATIC,avisynthplus"
+        else
+          STATIC="$BASE,amf,opencl"
+          DYNAMIC="$STATIC"
+        fi
+        ./builder/vcpkg install "ffmpeg[$STATIC]:${{ inputs.triplet-prefix }}-static"
+        ./builder/vcpkg install "ffmpeg[$DYNAMIC]:${{ inputs.triplet-prefix }}-dynamic"
 
     - name: Prepare binaries
       shell: bash

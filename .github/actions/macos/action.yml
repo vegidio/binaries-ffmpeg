@@ -33,12 +33,16 @@ runs:
       env:
         VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
       run: |
-        # vaapi is Linux-only, so it is omitted from the macOS feature set.
-        FEATURES="all-gpl,openssl,drawtext,zmq,dvdvideo"
-        ./builder/vcpkg install "ffmpeg[$FEATURES]:x64-osx"
-        ./builder/vcpkg install "ffmpeg[$FEATURES]:x64-osx-dynamic"
-        ./builder/vcpkg install "ffmpeg[$FEATURES]:arm64-osx"
-        ./builder/vcpkg install "ffmpeg[$FEATURES]:arm64-osx-dynamic"
+        # Curated feature list (the all-gpl meta-feature pulls ports that cannot
+        # build across all triplets: tensorflow, tesseract, modplug, openmpt).
+        # On macOS, amf/opencl/qsv/nvcodec/vaapi/alsa do not apply; ssh is x64-only.
+        BASE="gpl,sdl2,aom,avcodec,avdevice,avfilter,avformat,bzip2,freetype,iconv,lzma,mp3lame,openjpeg,opus,snappy,soxr,speex,swresample,swscale,theora,twolame,vorbis,vpx,vulkan,webp,xml2,zlib,openssl,drawtext,zmq,dvdvideo,ass,fontconfig,fribidi,openh264,srt,dav1d,ilbc"
+        X64="$BASE,opengl,x264,x265,ssh"
+        ARM64="$BASE,opengl,x264,x265"
+        ./builder/vcpkg install "ffmpeg[$X64]:x64-osx"
+        ./builder/vcpkg install "ffmpeg[$X64]:x64-osx-dynamic"
+        ./builder/vcpkg install "ffmpeg[$ARM64]:arm64-osx"
+        ./builder/vcpkg install "ffmpeg[$ARM64]:arm64-osx-dynamic"
 
     - name: Prepare binaries
       shell: bash

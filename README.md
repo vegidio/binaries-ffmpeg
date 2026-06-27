@@ -17,16 +17,20 @@ other projects.
 ## Build
 
 Binaries are built from [vcpkg](https://vcpkg.io) (pinned to release
-`2026.06.24`, which ships **FFmpeg 8.1.2**) with the feature set:
+`2026.06.24`, which ships **FFmpeg 8.1.2**) with a curated, GPL-compatible feature
+list covering all the common codecs, containers, protocols, filters and
+hardware-accel backends: x264, x265, AV1 (aom/dav1d), VP8/9, MP3, Opus, Vorbis,
+Theora, libass subtitles, drawtext, OpenSSL/TLS, SRT, SSH, zmq, DVD-Video, plus
+vaapi/qsv/nvcodec/amf/vulkan/opencl/opengl where the platform supports them.
 
-```
-ffmpeg[all-gpl,openssl,drawtext,vaapi,zmq,dvdvideo]
-```
+Platform-specific features are only enabled where they build (e.g. `vaapi`/`alsa`
+are Linux-only, `qsv`/`ssh` are x64-only, `x264`/`x265` are unavailable on
+Windows-ARM).
 
-This enables every redistributable feature the vcpkg port can build consistently
-across all platforms. `vaapi` is a Linux-only hardware-accel API and is omitted on
-macOS/Windows. The non-redistributable `fdk-aac` (HE-AAC) feature is intentionally
-excluded.
+Intentionally **excluded:** `fdk-aac` (non-redistributable HE-AAC), and four
+features whose ports cannot build cleanly across all platforms — `tensorflow`
+(DNN filter), `tesseract` (OCR), and `modplug`/`openmpt` (tracker-module
+decoders).
 
 ## License
 
