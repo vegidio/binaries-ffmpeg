@@ -9,7 +9,7 @@ runs:
     - name: Install dependencies
       shell: bash
       run: |
-        brew install nasm pkg-config
+        brew install nasm pkg-config autoconf autoconf-archive automake libtool
         mkdir -p $GITHUB_WORKSPACE/static_x64/lib
         mkdir -p $GITHUB_WORKSPACE/dynamic_x64/lib
         mkdir -p $GITHUB_WORKSPACE/static_arm64/lib

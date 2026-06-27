@@ -43,6 +43,11 @@ Artifact/zip naming (kept identical to avif): `static_<os>_<arch>.zip` /
 - **Feature set:** `ffmpeg[all-gpl,openssl,drawtext,rubberband,vaapi,zmq,dvdvideo]`.
   - `vaapi` is **Linux-only** (`supports: linux`) — it is omitted from the macOS
     and Windows feature strings, or vcpkg errors out.
+  - `rubberband`'s vcpkg port is **unsupported on `windows & static`** — the
+    Windows action uses separate `STATIC_FEATURES` (no rubberband) and
+    `DYNAMIC_FEATURES` (with rubberband) lists. An explicitly-named feature that
+    doesn't `support` a triplet aborts the whole vcpkg plan, unlike features
+    pulled transitively by the platform-guarded `all-gpl` meta-feature.
   - `openssl` transitively enables `version3` (`--enable-version3`). With `gpl`
     enabled, OpenSSL ≥3.0 *requires* version3 (FFmpeg's `configure` dies
     otherwise). Result: license `GPL version 3 or later` → **redistributable**.
@@ -57,9 +62,11 @@ Artifact/zip naming (kept identical to avif): `static_<os>_<arch>.zip` /
   **`tesseract`** (into all dynamic triplets) — both heavy and the most likely to
   fail or exceed CI time. If they break, the fallback is to replace `[all-gpl]`
   with an explicit curated feature list excluding them.
-- Linux features need system `-dev` packages; the action installs
-  `nasm yasm pkg-config libasound2-dev libgl1-mesa-dev libva-dev`. vcpkg prints
-  the exact `apt-get` package when one is missing — expand the list from the error.
+- Several vcpkg ports (`alsa` on Linux, `gperf` on macOS) build from source via
+  autotools, so both actions install `autoconf autoconf-archive automake libtool`
+  (`apt` / `brew`). On **Windows**, vcpkg fetches its own autotools via msys — no
+  package change needed. vcpkg prints the exact missing program/package on
+  failure — expand the install list from the error.
 - `arm64-mingw` (Windows ARM) is the least-tested FFmpeg target; vcpkg's platform
   guards auto-drop unsupported features (e.g. x264/x265 on Windows ARM).
 - The `actions/cache@v4` vcpkg binary cache makes cold builds (which compile

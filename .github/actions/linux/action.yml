@@ -18,7 +18,7 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y nasm yasm pkg-config libasound2-dev libgl1-mesa-dev libva-dev
+        sudo apt-get install -y nasm yasm pkg-config autoconf autoconf-archive automake libtool libgl1-mesa-dev libva-dev
         mkdir -p $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib
         mkdir -p $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/lib
         mkdir -p $GITHUB_WORKSPACE/vcpkg_cache

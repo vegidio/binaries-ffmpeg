@@ -52,9 +52,12 @@ runs:
         VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
       run: |
         # vaapi is Linux-only, so it is omitted from the Windows feature set.
-        FEATURES="all-gpl,openssl,drawtext,rubberband,zmq,dvdvideo"
-        ./builder/vcpkg install "ffmpeg[$FEATURES]:${{ inputs.triplet-prefix }}-static"
-        ./builder/vcpkg install "ffmpeg[$FEATURES]:${{ inputs.triplet-prefix }}-dynamic"
+        # rubberband's vcpkg port is unsupported on `windows & static`, so it is
+        # only included in the dynamic build.
+        STATIC_FEATURES="all-gpl,openssl,drawtext,zmq,dvdvideo"
+        DYNAMIC_FEATURES="all-gpl,openssl,drawtext,rubberband,zmq,dvdvideo"
+        ./builder/vcpkg install "ffmpeg[$STATIC_FEATURES]:${{ inputs.triplet-prefix }}-static"
+        ./builder/vcpkg install "ffmpeg[$DYNAMIC_FEATURES]:${{ inputs.triplet-prefix }}-dynamic"
 
     - name: Prepare binaries
       shell: bash
