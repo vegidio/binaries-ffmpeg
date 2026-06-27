@@ -20,12 +20,13 @@ Binaries are built from [vcpkg](https://vcpkg.io) (pinned to release
 `2026.06.24`, which ships **FFmpeg 8.1.2**) with the feature set:
 
 ```
-ffmpeg[all-gpl,openssl,drawtext,rubberband,vaapi,zmq,dvdvideo]
+ffmpeg[all-gpl,openssl,drawtext,vaapi,zmq,dvdvideo]
 ```
 
-This enables every redistributable feature the vcpkg port can build. `vaapi` is
-Linux-only and omitted on macOS/Windows. The non-redistributable `fdk-aac`
-(HE-AAC) feature is intentionally excluded.
+This enables every redistributable feature the vcpkg port can build consistently
+across all platforms. `vaapi` is a Linux-only hardware-accel API and is omitted on
+macOS/Windows. The non-redistributable `fdk-aac` (HE-AAC) feature is intentionally
+excluded.
 
 ## License
 

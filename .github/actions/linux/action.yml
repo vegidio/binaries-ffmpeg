@@ -40,7 +40,7 @@ runs:
       env:
         VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
       run: |
-        FEATURES="all-gpl,openssl,drawtext,rubberband,vaapi,zmq,dvdvideo"
+        FEATURES="all-gpl,openssl,drawtext,vaapi,zmq,dvdvideo"
         ./builder/vcpkg install "ffmpeg[$FEATURES]:${{ inputs.triplet }}"
         ./builder/vcpkg install "ffmpeg[$FEATURES]:${{ inputs.triplet }}-dynamic"
 

@@ -34,7 +34,7 @@ runs:
         VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
       run: |
         # vaapi is Linux-only, so it is omitted from the macOS feature set.
-        FEATURES="all-gpl,openssl,drawtext,rubberband,zmq,dvdvideo"
+        FEATURES="all-gpl,openssl,drawtext,zmq,dvdvideo"
         ./builder/vcpkg install "ffmpeg[$FEATURES]:x64-osx"
         ./builder/vcpkg install "ffmpeg[$FEATURES]:x64-osx-dynamic"
         ./builder/vcpkg install "ffmpeg[$FEATURES]:arm64-osx"

@@ -40,14 +40,15 @@ Artifact/zip naming (kept identical to avif): `static_<os>_<arch>.zip` /
 - **vcpkg is pinned to `2026.06.24`** (FFmpeg **8.1.2**) in every action's cache
   key, comment header, and `git clone --branch`. Bump all of them together to
   upgrade.
-- **Feature set:** `ffmpeg[all-gpl,openssl,drawtext,rubberband,vaapi,zmq,dvdvideo]`.
-  - `vaapi` is **Linux-only** (`supports: linux`) — it is omitted from the macOS
-    and Windows feature strings, or vcpkg errors out.
-  - `rubberband`'s vcpkg port is **unsupported on `windows & static`** — the
-    Windows action uses separate `STATIC_FEATURES` (no rubberband) and
-    `DYNAMIC_FEATURES` (with rubberband) lists. An explicitly-named feature that
-    doesn't `support` a triplet aborts the whole vcpkg plan, unlike features
-    pulled transitively by the platform-guarded `all-gpl` meta-feature.
+- **Feature set:** `ffmpeg[all-gpl,openssl,drawtext,vaapi,zmq,dvdvideo]`.
+  - `vaapi` is **Linux-only** (`supports: linux`, a Linux-only HW-accel API) — it
+    is omitted from the macOS and Windows feature strings, or vcpkg errors out.
+  - `rubberband` was **removed from all OSes** to keep the produced library set
+    uniform: its port is unsupported on `windows & static`, and a feature present
+    on some platforms but not others is inconsistent for downstream consumers.
+  - Lesson: an explicitly-named feature that doesn't `support` a triplet aborts the
+    whole vcpkg plan, unlike features pulled transitively by the platform-guarded
+    `all-gpl` meta-feature. Explicit extras must build on **every** target triplet.
   - `openssl` transitively enables `version3` (`--enable-version3`). With `gpl`
     enabled, OpenSSL ≥3.0 *requires* version3 (FFmpeg's `configure` dies
     otherwise). Result: license `GPL version 3 or later` → **redistributable**.
