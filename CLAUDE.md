@@ -57,8 +57,10 @@ Artifact/zip naming (kept identical to avif): `static_<os>_<arch>.zip` /
     - `qsv` → x64 + (Linux|Windows) only.
     - `x264`, `x265` → not Windows-ARM.
     - `avisynthplus` → Windows-x64-dynamic only.
-    - `opencl` → Linux only (FFmpeg's configure can't find it under mingw; also
-      not on macOS per its own guard).
+    - `opencl` → Linux + Windows; not macOS (Apple deprecated it, vcpkg has only
+      the ICD loader → no runtime device). On Windows the loader is shipped as
+      `OpenCL.a`/`OpenCL.dll.a`, so the action pre-installs `opencl` and adds a
+      `libOpenCL.*` alias so FFmpeg's `-lOpenCL` link test resolves.
     - `vpx` → everywhere except Windows-ARM (libvpx fails to build there).
     - `rubberband` → everywhere except Windows **static** (port unsupported on
       `windows & static`); on Windows it's added to the dynamic build only.

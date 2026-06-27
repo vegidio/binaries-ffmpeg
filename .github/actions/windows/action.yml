@@ -57,11 +57,22 @@ runs:
         # build across all triplets: tensorflow, tesseract, modplug, openmpt).
         # Windows-ARM drops ssh/opengl/nvcodec/qsv/x264/x265 (unsupported there);
         # avisynthplus is only valid on windows-x64-dynamic.
-        # opencl is dropped on Windows: FFmpeg's configure cannot locate it under
-        # mingw ("ERROR: opencl not found"). It is kept on Linux.
+        # OpenCL fix for Windows: FFmpeg's configure links it with `-lOpenCL`, but
+        # vcpkg's ICD loader installs it on Windows as OpenCL.a / OpenCL.dll.a
+        # (Windows naming, without the `lib` prefix MinGW's linker needs). So we
+        # pre-install opencl and add a libOpenCL.* alias before building FFmpeg.
+        alias_opencl() {
+          d="$GITHUB_WORKSPACE/builder/installed/$1/lib"
+          [ -f "$d/OpenCL.a" ] && cp -n "$d/OpenCL.a" "$d/libOpenCL.a" || true
+          [ -f "$d/OpenCL.dll.a" ] && cp -n "$d/OpenCL.dll.a" "$d/libOpenCL.dll.a" || true
+        }
+        ./builder/vcpkg install "opencl:${{ inputs.triplet-prefix }}-static" "opencl:${{ inputs.triplet-prefix }}-dynamic"
+        alias_opencl "${{ inputs.triplet-prefix }}-static"
+        alias_opencl "${{ inputs.triplet-prefix }}-dynamic"
+
         # rubberband: its port is unsupported on `windows & static`, so it is only
         # added to the dynamic build.
-        BASE="gpl,sdl2,aom,avcodec,avdevice,avfilter,avformat,bzip2,freetype,iconv,lzma,mp3lame,openjpeg,opus,snappy,soxr,speex,swresample,swscale,theora,twolame,vorbis,vpx,vulkan,webp,xml2,zlib,openssl,drawtext,zmq,dvdvideo,ass,fontconfig,fribidi,openh264,srt,dav1d,ilbc"
+        BASE="gpl,sdl2,aom,avcodec,avdevice,avfilter,avformat,bzip2,freetype,iconv,lzma,mp3lame,openjpeg,opus,snappy,soxr,speex,swresample,swscale,theora,twolame,vorbis,vpx,vulkan,webp,xml2,zlib,openssl,opencl,drawtext,zmq,dvdvideo,ass,fontconfig,fribidi,openh264,srt,dav1d,ilbc"
         if [ "${{ inputs.arch }}" = "x64" ]; then
           STATIC="$BASE,ssh,amf,opengl,nvcodec,qsv,x264,x265"
           DYNAMIC="$STATIC,avisynthplus,rubberband"

@@ -86,7 +86,7 @@ Legend: ✅ available · ❌ not available. Columns are `OS-arch`.
 | nvcodec | NVIDIA NVENC/NVDEC | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ |
 | qsv | Intel Quick Sync (oneVPL) | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
 | vaapi | VA-API (Linux) | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
-| opencl | OpenCL filters | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
+| opencl | OpenCL filters | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
 | alsa | ALSA audio I/O | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
 
 ¹ **rubberband on Windows: dynamic builds only.** Its vcpkg port is unsupported on
@@ -101,9 +101,12 @@ builds.
   `arm64-mingw` in vcpkg (they rely on x86 assembly / lack ARM-Windows support).
   AV1 (aom/dav1d) and the other decoders are still available there.
 - **ssh on arm64** — the `libssh` vcpkg port is marked unsupported on arm.
-- **opencl on Windows** — FFmpeg's `configure` cannot locate OpenCL under MinGW
-  (`ERROR: opencl not found`). It is kept on Linux.
-- **amf / nvcodec / qsv / opencl / vaapi / alsa on macOS** — these backends are
+- **opencl on macOS** — Apple deprecated OpenCL (since 10.14, in favour of Metal),
+  and vcpkg only provides the Khronos ICD loader rather than Apple's
+  `OpenCL.framework`, so it would find no device at runtime. (On Windows, OpenCL
+  *is* enabled — vcpkg ships the loader as `OpenCL.a`/`OpenCL.dll.a`, so the build
+  adds a `libOpenCL.*` alias for FFmpeg's `-lOpenCL` link test.)
+- **amf / nvcodec / qsv / vaapi / alsa on macOS** — these backends are
   Windows/Linux technologies and are not provided on Apple platforms.
 - **nvcodec / opengl on Windows-ARM, qsv on arm** — unsupported by the respective
   vcpkg ports on those targets.
