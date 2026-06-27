@@ -49,7 +49,7 @@ runs:
         # libvpx cannot build as a shared library on MinGW ("--enable-shared only
         # supported on ELF, OS/2, and Darwin"), so force it to static linkage even
         # in the dynamic triplet (it gets statically linked into the FFmpeg DLLs).
-        find builder/triplets -name '*.cmake' -exec bash -c 'echo "if(PORT STREQUAL \"libvpx\") set(VCPKG_LIBRARY_LINKAGE static) endif()" >> "$1"' _ {} \;
+        find builder/triplets -name '*.cmake' -exec bash -c 'printf "\nif(PORT STREQUAL \"libvpx\")\n    set(VCPKG_LIBRARY_LINKAGE static)\nendif()\n" >> "$1"' _ {} \;
 
     - name: Build FFmpeg
       shell: msys2 {0}
