@@ -1,0 +1,77 @@
+name: "macos"
+
+# Pinned upstream versions — bump these to upgrade.
+# vcpkg release tag: 2026.06.24 (FFmpeg 8.1.2)
+
+runs:
+  using: composite
+  steps:
+    - name: Install dependencies
+      shell: bash
+      run: |
+        brew install nasm pkg-config
+        mkdir -p $GITHUB_WORKSPACE/static_x64/lib
+        mkdir -p $GITHUB_WORKSPACE/dynamic_x64/lib
+        mkdir -p $GITHUB_WORKSPACE/static_arm64/lib
+        mkdir -p $GITHUB_WORKSPACE/dynamic_arm64/lib
+        mkdir -p $GITHUB_WORKSPACE/vcpkg_cache
+
+    - name: Cache vcpkg binaries
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/vcpkg_cache
+        key: vcpkg-${{ runner.os }}-osx-2026.06.24
+
+    - name: Install vcpkg
+      shell: bash
+      run: |
+        git clone --depth 1 --branch 2026.06.24 https://github.com/microsoft/vcpkg builder
+        ./builder/bootstrap-vcpkg.sh
+
+    - name: Build FFmpeg
+      shell: bash
+      env:
+        VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
+      run: |
+        # vaapi is Linux-only, so it is omitted from the macOS feature set.
+        FEATURES="all-gpl,openssl,drawtext,rubberband,zmq,dvdvideo"
+        ./builder/vcpkg install "ffmpeg[$FEATURES]:x64-osx"
+        ./builder/vcpkg install "ffmpeg[$FEATURES]:x64-osx-dynamic"
+        ./builder/vcpkg install "ffmpeg[$FEATURES]:arm64-osx"
+        ./builder/vcpkg install "ffmpeg[$FEATURES]:arm64-osx-dynamic"
+
+    - name: Prepare binaries
+      shell: bash
+      run: |
+        cp -r $GITHUB_WORKSPACE/builder/installed/x64-osx/include $GITHUB_WORKSPACE/static_x64/include
+        cp $GITHUB_WORKSPACE/builder/installed/x64-osx/lib/*.a $GITHUB_WORKSPACE/static_x64/lib
+
+        cp -r $GITHUB_WORKSPACE/builder/installed/x64-osx-dynamic/include $GITHUB_WORKSPACE/dynamic_x64/include
+        cp -a $GITHUB_WORKSPACE/builder/installed/x64-osx-dynamic/lib/*.dylib $GITHUB_WORKSPACE/dynamic_x64/lib
+
+        cp -r $GITHUB_WORKSPACE/builder/installed/arm64-osx/include $GITHUB_WORKSPACE/static_arm64/include
+        cp $GITHUB_WORKSPACE/builder/installed/arm64-osx/lib/*.a $GITHUB_WORKSPACE/static_arm64/lib
+
+        cp -r $GITHUB_WORKSPACE/builder/installed/arm64-osx-dynamic/include $GITHUB_WORKSPACE/dynamic_arm64/include
+        cp -a $GITHUB_WORKSPACE/builder/installed/arm64-osx-dynamic/lib/*.dylib $GITHUB_WORKSPACE/dynamic_arm64/lib
+
+    - name: Zip local
+      shell: bash
+      run: |
+        cd $GITHUB_WORKSPACE/static_x64
+        7z a -tzip -mx=9 $GITHUB_WORKSPACE/static_osx_x64.zip include lib
+
+        cd $GITHUB_WORKSPACE/dynamic_x64
+        7z a -tzip -mx=9 $GITHUB_WORKSPACE/dynamic_osx_x64.zip include lib
+
+        cd $GITHUB_WORKSPACE/static_arm64
+        7z a -tzip -mx=9 $GITHUB_WORKSPACE/static_osx_arm64.zip include lib
+
+        cd $GITHUB_WORKSPACE/dynamic_arm64
+        7z a -tzip -mx=9 $GITHUB_WORKSPACE/dynamic_osx_arm64.zip include lib
+
+    - name: Save artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: binaries-osx
+        path: "*.zip"
