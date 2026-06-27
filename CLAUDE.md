@@ -18,8 +18,9 @@ them with `ncipollo/release-action`.
 
 Each platform job delegates to a composite action:
 
-- `.github/actions/macos/action.yml` — builds **4** triplets on one runner:
-  `x64-osx`, `x64-osx-dynamic`, `arm64-osx`, `arm64-osx-dynamic`.
+- `.github/actions/macos/action.yml` — one arch per **native** runner (`macos-13`
+  = x64, `macos-latest` = arm64); builds `<arch>-osx` (static) and
+  `<arch>-osx-dynamic`.
 - `.github/actions/linux/action.yml` — one arch per runner (`ubuntu-latest` = x64,
   `ubuntu-24.04-arm` = arm64); builds `<arch>-linux` (static) and
   `<arch>-linux-dynamic`.
@@ -56,14 +57,22 @@ Artifact/zip naming (kept identical to avif): `static_<os>_<arch>.zip` /
     - `qsv` → x64 + (Linux|Windows) only.
     - `x264`, `x265` → not Windows-ARM.
     - `avisynthplus` → Windows-x64-dynamic only.
+    - `opencl` → Linux/macOS only (FFmpeg's configure can't find it under mingw).
+    - `vpx` → everywhere except Windows-ARM (libvpx fails to build there).
+  - **Per-platform policy** (user-approved): a feature is enabled wherever it
+    builds, not gated to the lowest common denominator. So Windows-ARM has the
+    smallest set, and opencl is present on Linux/macOS but absent on Windows.
   - **Excluded:** `tensorflow`, `tesseract`, `modplug`, `openmpt` (won't build —
     user-approved), `fdk-aac` (nonfree/HE-AAC → non-redistributable), `avresample`
     (removed from FFmpeg in 5.0), and the apps (libraries only).
   - `openssl` transitively enables `version3` (`--enable-version3`). With `gpl`
     enabled, OpenSSL ≥3.0 *requires* version3 (FFmpeg's `configure` dies
     otherwise). Result: license `GPL version 3 or later` → **redistributable**.
-  - `libxcrypt` (a transitive Linux dep) needs the system package `libltdl-dev`,
-    installed by the Linux action.
+  - `libxcrypt` (transitive Linux dep) needs `libltdl-dev`; `libva`/`vaapi` need
+    `libdrm-dev` — both installed by the Linux action.
+- **Release-only builds:** each action appends `set(VCPKG_BUILD_TYPE release)` to
+  every triplet file after bootstrap, so vcpkg skips Debug (roughly halves build
+  time).
 - **Static libs are `.a` on every OS** (MinGW on Windows, not MSVC `.lib`).
 
 ## Known risks / first-run gotchas

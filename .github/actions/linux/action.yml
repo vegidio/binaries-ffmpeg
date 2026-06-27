@@ -18,7 +18,7 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y nasm yasm pkg-config autoconf autoconf-archive automake libtool libltdl-dev libgl1-mesa-dev libva-dev
+        sudo apt-get install -y nasm yasm pkg-config autoconf autoconf-archive automake libtool libltdl-dev libdrm-dev libgl1-mesa-dev libva-dev
         mkdir -p $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib
         mkdir -p $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/lib
         mkdir -p $GITHUB_WORKSPACE/vcpkg_cache
@@ -34,6 +34,8 @@ runs:
       run: |
         git clone --depth 1 --branch 2026.06.24 https://github.com/microsoft/vcpkg builder
         ./builder/bootstrap-vcpkg.sh
+        # Build only Release (skip Debug) for every triplet to roughly halve build time.
+        find builder/triplets -name '*.cmake' -exec bash -c 'echo "set(VCPKG_BUILD_TYPE release)" >> "$1"' _ {} \;
 
     - name: Build FFmpeg
       shell: bash

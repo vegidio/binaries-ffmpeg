@@ -44,6 +44,8 @@ runs:
         mkdir -p $GITHUB_WORKSPACE/vcpkg_cache
         git clone --depth 1 --branch 2026.06.24 https://github.com/microsoft/vcpkg builder
         ./builder/bootstrap-vcpkg.sh
+        # Build only Release (skip Debug) for every triplet to roughly halve build time.
+        find builder/triplets -name '*.cmake' -exec bash -c 'echo "set(VCPKG_BUILD_TYPE release)" >> "$1"' _ {} \;
 
     - name: Build FFmpeg
       shell: msys2 {0}
@@ -55,12 +57,17 @@ runs:
         # build across all triplets: tensorflow, tesseract, modplug, openmpt).
         # Windows-ARM drops ssh/opengl/nvcodec/qsv/x264/x265 (unsupported there);
         # avisynthplus is only valid on windows-x64-dynamic.
+        # opencl is dropped on Windows: FFmpeg's configure cannot locate it under
+        # mingw ("ERROR: opencl not found"). It is kept on Linux/macOS.
         BASE="gpl,sdl2,aom,avcodec,avdevice,avfilter,avformat,bzip2,freetype,iconv,lzma,mp3lame,openjpeg,opus,snappy,soxr,speex,swresample,swscale,theora,twolame,vorbis,vpx,vulkan,webp,xml2,zlib,openssl,drawtext,zmq,dvdvideo,ass,fontconfig,fribidi,openh264,srt,dav1d,ilbc"
         if [ "${{ inputs.arch }}" = "x64" ]; then
-          STATIC="$BASE,ssh,amf,opencl,opengl,nvcodec,qsv,x264,x265"
+          STATIC="$BASE,ssh,amf,opengl,nvcodec,qsv,x264,x265"
           DYNAMIC="$STATIC,avisynthplus"
         else
-          STATIC="$BASE,amf,opencl"
+          # Windows-ARM: libvpx, x264/x265, opengl, nvcodec, qsv and ssh are all
+          # unsupported here, so the arm64 build is the smallest set.
+          ARM_BASE="${BASE/,vpx/}"
+          STATIC="$ARM_BASE,amf"
           DYNAMIC="$STATIC"
         fi
         ./builder/vcpkg install "ffmpeg[$STATIC]:${{ inputs.triplet-prefix }}-static"

@@ -10,15 +10,30 @@ permissions:
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            arch: x64
+            triplet: x64-osx
+            deployment: "10.15"
+          - runner: macos-latest
+            arch: arm64
+            triplet: arm64-osx
+            deployment: "11.0"
+    runs-on: ${{ matrix.runner }}
     env:
-      MACOSX_DEPLOYMENT_TARGET: "10.15"
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment }}
     steps:
       - name: Code checkout
         uses: actions/checkout@v5
 
       - name: Create macOS binaries
         uses: ./.github/actions/macos
+        with:
+          arch: ${{ matrix.arch }}
+          triplet: ${{ matrix.triplet }}
 
   build-linux:
     strategy:

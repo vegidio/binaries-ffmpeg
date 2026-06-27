@@ -3,6 +3,14 @@ name: "macos"
 # Pinned upstream versions — bump these to upgrade.
 # vcpkg release tag: 2026.06.24 (FFmpeg 8.1.2)
 
+inputs:
+  arch:
+    description: "Target architecture suffix (e.g. x64, arm64)"
+    required: true
+  triplet:
+    description: "vcpkg static triplet (e.g. x64-osx); the dynamic triplet is derived as <triplet>-dynamic"
+    required: true
+
 runs:
   using: composite
   steps:
@@ -10,23 +18,23 @@ runs:
       shell: bash
       run: |
         brew install nasm pkg-config autoconf autoconf-archive automake libtool
-        mkdir -p $GITHUB_WORKSPACE/static_x64/lib
-        mkdir -p $GITHUB_WORKSPACE/dynamic_x64/lib
-        mkdir -p $GITHUB_WORKSPACE/static_arm64/lib
-        mkdir -p $GITHUB_WORKSPACE/dynamic_arm64/lib
+        mkdir -p $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib
+        mkdir -p $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/lib
         mkdir -p $GITHUB_WORKSPACE/vcpkg_cache
 
     - name: Cache vcpkg binaries
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/vcpkg_cache
-        key: vcpkg-${{ runner.os }}-osx-2026.06.24
+        key: vcpkg-${{ runner.os }}-${{ inputs.triplet }}-2026.06.24
 
     - name: Install vcpkg
       shell: bash
       run: |
         git clone --depth 1 --branch 2026.06.24 https://github.com/microsoft/vcpkg builder
         ./builder/bootstrap-vcpkg.sh
+        # Build only Release (skip Debug) for every triplet to roughly halve build time.
+        find builder/triplets -name '*.cmake' -exec bash -c 'echo "set(VCPKG_BUILD_TYPE release)" >> "$1"' _ {} \;
 
     - name: Build FFmpeg
       shell: bash
@@ -37,45 +45,34 @@ runs:
         # build across all triplets: tensorflow, tesseract, modplug, openmpt).
         # On macOS, amf/opencl/qsv/nvcodec/vaapi/alsa do not apply; ssh is x64-only.
         BASE="gpl,sdl2,aom,avcodec,avdevice,avfilter,avformat,bzip2,freetype,iconv,lzma,mp3lame,openjpeg,opus,snappy,soxr,speex,swresample,swscale,theora,twolame,vorbis,vpx,vulkan,webp,xml2,zlib,openssl,drawtext,zmq,dvdvideo,ass,fontconfig,fribidi,openh264,srt,dav1d,ilbc"
-        X64="$BASE,opengl,x264,x265,ssh"
-        ARM64="$BASE,opengl,x264,x265"
-        ./builder/vcpkg install "ffmpeg[$X64]:x64-osx"
-        ./builder/vcpkg install "ffmpeg[$X64]:x64-osx-dynamic"
-        ./builder/vcpkg install "ffmpeg[$ARM64]:arm64-osx"
-        ./builder/vcpkg install "ffmpeg[$ARM64]:arm64-osx-dynamic"
+        FEATURES="$BASE,opengl,x264,x265"
+        if [ "${{ inputs.arch }}" = "x64" ]; then
+          # ssh: vcpkg port is unsupported on arm
+          FEATURES="$FEATURES,ssh"
+        fi
+        ./builder/vcpkg install "ffmpeg[$FEATURES]:${{ inputs.triplet }}"
+        ./builder/vcpkg install "ffmpeg[$FEATURES]:${{ inputs.triplet }}-dynamic"
 
     - name: Prepare binaries
       shell: bash
       run: |
-        cp -r $GITHUB_WORKSPACE/builder/installed/x64-osx/include $GITHUB_WORKSPACE/static_x64/include
-        cp $GITHUB_WORKSPACE/builder/installed/x64-osx/lib/*.a $GITHUB_WORKSPACE/static_x64/lib
+        cp -r $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}/include $GITHUB_WORKSPACE/static_${{ inputs.arch }}/include
+        cp $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}/lib/*.a $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib
 
-        cp -r $GITHUB_WORKSPACE/builder/installed/x64-osx-dynamic/include $GITHUB_WORKSPACE/dynamic_x64/include
-        cp -a $GITHUB_WORKSPACE/builder/installed/x64-osx-dynamic/lib/*.dylib $GITHUB_WORKSPACE/dynamic_x64/lib
-
-        cp -r $GITHUB_WORKSPACE/builder/installed/arm64-osx/include $GITHUB_WORKSPACE/static_arm64/include
-        cp $GITHUB_WORKSPACE/builder/installed/arm64-osx/lib/*.a $GITHUB_WORKSPACE/static_arm64/lib
-
-        cp -r $GITHUB_WORKSPACE/builder/installed/arm64-osx-dynamic/include $GITHUB_WORKSPACE/dynamic_arm64/include
-        cp -a $GITHUB_WORKSPACE/builder/installed/arm64-osx-dynamic/lib/*.dylib $GITHUB_WORKSPACE/dynamic_arm64/lib
+        cp -r $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}-dynamic/include $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/include
+        cp -a $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}-dynamic/lib/*.dylib $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/lib
 
     - name: Zip local
       shell: bash
       run: |
-        cd $GITHUB_WORKSPACE/static_x64
-        7z a -tzip -mx=9 $GITHUB_WORKSPACE/static_osx_x64.zip include lib
+        cd $GITHUB_WORKSPACE/static_${{ inputs.arch }}
+        7z a -tzip -mx=9 $GITHUB_WORKSPACE/static_osx_${{ inputs.arch }}.zip include lib
 
-        cd $GITHUB_WORKSPACE/dynamic_x64
-        7z a -tzip -mx=9 $GITHUB_WORKSPACE/dynamic_osx_x64.zip include lib
-
-        cd $GITHUB_WORKSPACE/static_arm64
-        7z a -tzip -mx=9 $GITHUB_WORKSPACE/static_osx_arm64.zip include lib
-
-        cd $GITHUB_WORKSPACE/dynamic_arm64
-        7z a -tzip -mx=9 $GITHUB_WORKSPACE/dynamic_osx_arm64.zip include lib
+        cd $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}
+        7z a -tzip -mx=9 $GITHUB_WORKSPACE/dynamic_osx_${{ inputs.arch }}.zip include lib
 
     - name: Save artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: binaries-osx
+        name: binaries-osx-${{ inputs.arch }}
         path: "*.zip"
