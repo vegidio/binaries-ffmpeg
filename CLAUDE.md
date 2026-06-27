@@ -18,9 +18,10 @@ them with `ncipollo/release-action`.
 
 Each platform job delegates to a composite action:
 
-- `.github/actions/macos/action.yml` — one arch per **native** runner (`macos-13`
-  = x64, `macos-latest` = arm64); builds `<arch>-osx` (static) and
-  `<arch>-osx-dynamic`.
+- `.github/actions/macos/action.yml` — one arch per matrix job, **both on
+  `macos-latest` (arm64 hardware)**: arm64 builds natively, x64 cross-compiles
+  (the `x64-osx` triplet sets `VCPKG_OSX_ARCHITECTURES=x86_64`). Intel `macos-13`
+  runners are scarce and often never get picked up, hence the cross-compile.
 - `.github/actions/linux/action.yml` — one arch per runner (`ubuntu-latest` = x64,
   `ubuntu-24.04-arm` = arm64); builds `<arch>-linux` (static) and
   `<arch>-linux-dynamic`.
@@ -61,15 +62,20 @@ Artifact/zip naming (kept identical to avif): `static_<os>_<arch>.zip` /
       the ICD loader → no runtime device). On Windows the loader is shipped as
       `OpenCL.a`/`OpenCL.dll.a`, so the action pre-installs `opencl` and adds a
       `libOpenCL.*` alias so FFmpeg's `-lOpenCL` link test resolves.
-    - `vpx` → everywhere except Windows-ARM (libvpx fails to build there).
-    - `rubberband` → everywhere except Windows **static** (port unsupported on
-      `windows & static`); on Windows it's added to the dynamic build only.
+    - `vpx` → everywhere except Windows-ARM (libvpx fails to build there). On
+      Windows it cannot build *shared*, so the Windows triplets force
+      `libvpx` to static linkage (`if(PORT STREQUAL "libvpx") ... static)`), and
+      it gets statically linked into the FFmpeg DLLs.
+    - `sdl2` → not Linux (vcpkg build links `-liconv` against the glibc-stub
+      libiconv and fails).
+    - `zmq` → not Windows-ARM (`zeromq` v4.3.5 fails to compile on arm64).
   - **Per-platform policy** (user-approved): a feature is enabled wherever it
     builds, not gated to the lowest common denominator. So Windows-ARM has the
     smallest set, and opencl is present on Linux/macOS but absent on Windows.
-  - **Excluded:** `tensorflow`, `tesseract`, `modplug`, `openmpt` (won't build —
-    user-approved), `fdk-aac` (nonfree/HE-AAC → non-redistributable), `avresample`
-    (removed from FFmpeg in 5.0), and the apps (libraries only).
+  - **Excluded everywhere:** `tensorflow`, `tesseract`, `modplug`, `openmpt`,
+    `rubberband` (v4.0.0 `size_t` compile bug) — all won't build; `fdk-aac`
+    (nonfree/HE-AAC → non-redistributable), `avresample` (removed from FFmpeg in
+    5.0), and the apps (libraries only).
   - `openssl` transitively enables `version3` (`--enable-version3`). With `gpl`
     enabled, OpenSSL ≥3.0 *requires* version3 (FFmpeg's `configure` dies
     otherwise). Result: license `GPL version 3 or later` → **redistributable**.

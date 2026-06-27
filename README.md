@@ -58,7 +58,6 @@ Legend: ✅ available · ❌ not available. Columns are `OS-arch`.
 | fribidi | bidirectional text | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | drawtext | drawtext filter (harfbuzz) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | soxr | high-quality resampling | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| rubberband | audio time-stretch/pitch | ✅ | ✅ | ✅ | ✅ | ⚠️¹ | ⚠️¹ |
 
 ### Containers, protocols & misc
 
@@ -67,14 +66,14 @@ Legend: ✅ available · ❌ not available. Columns are `OS-arch`.
 | openssl | TLS (https/tls/rtmps) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | srt | Haivision SRT protocol | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | ssh | SFTP protocol (libssh) | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
-| zmq | ZeroMQ filters | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| zmq | ZeroMQ filters | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | dvdvideo | DVD-Video demuxer | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | xml2 | DASH demuxing (libxml2) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| sdl2 | SDL2 (avdevice output) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| sdl2 | SDL2 (avdevice output) | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
 | snappy | Snappy (HAP) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | bzip2 / lzma / zlib | compression | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | iconv | charset conversion | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| avisynthplus | AviSynth+ script demuxer | ❌ | ❌ | ❌ | ❌ | ⚠️² | ❌ |
+| avisynthplus | AviSynth+ script demuxer | ❌ | ❌ | ❌ | ❌ | ⚠️¹ | ❌ |
 
 ### Hardware acceleration / GPU
 
@@ -89,10 +88,7 @@ Legend: ✅ available · ❌ not available. Columns are `OS-arch`.
 | opencl | OpenCL filters | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
 | alsa | ALSA audio I/O | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
 
-¹ **rubberband on Windows: dynamic builds only.** Its vcpkg port is unsupported on
-`windows & static`, so it is present in the `.dll` builds but absent from the `.a`
-builds.
-² **avisynthplus: Windows x64 dynamic build only** (the port requires
+¹ **avisynthplus: Windows x64 dynamic build only** (the port requires
 `windows & !static`, and is unavailable on Windows-ARM).
 
 ## Why some features are missing
@@ -110,6 +106,12 @@ builds.
   Windows/Linux technologies and are not provided on Apple platforms.
 - **nvcodec / opengl on Windows-ARM, qsv on arm** — unsupported by the respective
   vcpkg ports on those targets.
+- **sdl2 on Linux** — the vcpkg `sdl2` build links `-liconv`, but on glibc systems
+  vcpkg's `libiconv` is a stub (no link library), so the link fails. SDL2 only
+  provides the `sdl2` output device in `libavdevice`, which library consumers
+  rarely need.
+- **zmq on Windows-ARM** — the `zeromq` v4.3.5 port fails to compile on arm64
+  (`use of undeclared identifier 'nsecs_per_usec'`).
 
 ## Features intentionally excluded everywhere
 
@@ -120,6 +122,7 @@ builds.
 | `tesseract` (OCR filter) | Heavy; dropped to avoid failures in the dynamic builds. |
 | `modplug` | libmodplug (C++) fails to link into FFmpeg (C) on MinGW. |
 | `openmpt` | Pulls `mpg123`, which has an upstream ARM build bug. |
+| `rubberband` | Its v4.0.0 port fails to compile with modern compilers (`unknown type name 'size_t'`). |
 | `avresample` | Removed from FFmpeg in 5.0. |
 | `ffmpeg` / `ffplay` / `ffprobe` apps | Only libraries are produced. |
 

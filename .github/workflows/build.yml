@@ -14,7 +14,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-13
+          # Intel macOS runners (macos-13) are scarce and frequently never get
+          # picked up, so x64 is cross-compiled on an arm64 runner (the x64-osx
+          # triplet sets VCPKG_OSX_ARCHITECTURES=x86_64 automatically).
+          - runner: macos-latest
             arch: x64
             triplet: x64-osx
             deployment: "10.15"

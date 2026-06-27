@@ -45,7 +45,8 @@ runs:
         # build across all triplets: tensorflow, tesseract, modplug, openmpt).
         # On macOS, amf/opencl/qsv/nvcodec/vaapi/alsa do not apply; ssh is x64-only.
         BASE="gpl,sdl2,aom,avcodec,avdevice,avfilter,avformat,bzip2,freetype,iconv,lzma,mp3lame,openjpeg,opus,snappy,soxr,speex,swresample,swscale,theora,twolame,vorbis,vpx,vulkan,webp,xml2,zlib,openssl,drawtext,zmq,dvdvideo,ass,fontconfig,fribidi,openh264,srt,dav1d,ilbc"
-        FEATURES="$BASE,opengl,x264,x265,rubberband"
+        # rubberband omitted: its port (v4.0.0) fails to compile with modern compilers.
+        FEATURES="$BASE,opengl,x264,x265"
         if [ "${{ inputs.arch }}" = "x64" ]; then
           # ssh: vcpkg port is unsupported on arm
           FEATURES="$FEATURES,ssh"

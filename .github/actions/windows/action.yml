@@ -46,6 +46,10 @@ runs:
         ./builder/bootstrap-vcpkg.sh
         # Build only Release (skip Debug) for every triplet to roughly halve build time.
         find builder/triplets -name '*.cmake' -exec bash -c 'echo "set(VCPKG_BUILD_TYPE release)" >> "$1"' _ {} \;
+        # libvpx cannot build as a shared library on MinGW ("--enable-shared only
+        # supported on ELF, OS/2, and Darwin"), so force it to static linkage even
+        # in the dynamic triplet (it gets statically linked into the FFmpeg DLLs).
+        find builder/triplets -name '*.cmake' -exec bash -c 'echo "if(PORT STREQUAL \"libvpx\") set(VCPKG_LIBRARY_LINKAGE static) endif()" >> "$1"' _ {} \;
 
     - name: Build FFmpeg
       shell: msys2 {0}
@@ -70,18 +74,19 @@ runs:
         alias_opencl "${{ inputs.triplet-prefix }}-static"
         alias_opencl "${{ inputs.triplet-prefix }}-dynamic"
 
-        # rubberband: its port is unsupported on `windows & static`, so it is only
-        # added to the dynamic build.
+        # rubberband is omitted: its vcpkg port (v4.0.0) fails to compile with
+        # modern compilers ("unknown type name 'size_t'").
         BASE="gpl,sdl2,aom,avcodec,avdevice,avfilter,avformat,bzip2,freetype,iconv,lzma,mp3lame,openjpeg,opus,snappy,soxr,speex,swresample,swscale,theora,twolame,vorbis,vpx,vulkan,webp,xml2,zlib,openssl,opencl,drawtext,zmq,dvdvideo,ass,fontconfig,fribidi,openh264,srt,dav1d,ilbc"
         if [ "${{ inputs.arch }}" = "x64" ]; then
           STATIC="$BASE,ssh,amf,opengl,nvcodec,qsv,x264,x265"
-          DYNAMIC="$STATIC,avisynthplus,rubberband"
+          DYNAMIC="$STATIC,avisynthplus"
         else
-          # Windows-ARM: libvpx, x264/x265, opengl, nvcodec, qsv and ssh are all
-          # unsupported here, so the arm64 build is the smallest set.
+          # Windows-ARM: libvpx, x264/x265, opengl, nvcodec, qsv, ssh are unsupported,
+          # and zeromq (zmq) fails to compile on arm64 — so this is the smallest set.
           ARM_BASE="${BASE/,vpx/}"
+          ARM_BASE="${ARM_BASE/,zmq/}"
           STATIC="$ARM_BASE,amf"
-          DYNAMIC="$STATIC,rubberband"
+          DYNAMIC="$STATIC"
         fi
         ./builder/vcpkg install "ffmpeg[$STATIC]:${{ inputs.triplet-prefix }}-static"
         ./builder/vcpkg install "ffmpeg[$DYNAMIC]:${{ inputs.triplet-prefix }}-dynamic"
