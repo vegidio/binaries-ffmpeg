@@ -47,7 +47,7 @@ runs:
         # BASE = features supported on every triplet; the rest are gated per the
         # same platform rules vcpkg's `all`/`all-gpl` meta-features use.
         BASE="gpl,sdl2,aom,avcodec,avdevice,avfilter,avformat,bzip2,freetype,iconv,lzma,mp3lame,openjpeg,opus,snappy,soxr,speex,swresample,swscale,theora,twolame,vorbis,vpx,vulkan,webp,xml2,zlib,openssl,drawtext,zmq,dvdvideo,ass,fontconfig,fribidi,openh264,srt,dav1d,ilbc"
-        FEATURES="$BASE,alsa,vaapi,amf,opencl,opengl,nvcodec,x264,x265"
+        FEATURES="$BASE,alsa,vaapi,amf,opencl,opengl,nvcodec,x264,x265,rubberband"
         if [ "${{ inputs.arch }}" = "x64" ]; then
           # ssh: vcpkg port is unsupported on arm; qsv: x64-only
           FEATURES="$FEATURES,ssh,qsv"

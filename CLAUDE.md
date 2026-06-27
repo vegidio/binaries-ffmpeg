@@ -57,8 +57,11 @@ Artifact/zip naming (kept identical to avif): `static_<os>_<arch>.zip` /
     - `qsv` → x64 + (Linux|Windows) only.
     - `x264`, `x265` → not Windows-ARM.
     - `avisynthplus` → Windows-x64-dynamic only.
-    - `opencl` → Linux/macOS only (FFmpeg's configure can't find it under mingw).
+    - `opencl` → Linux only (FFmpeg's configure can't find it under mingw; also
+      not on macOS per its own guard).
     - `vpx` → everywhere except Windows-ARM (libvpx fails to build there).
+    - `rubberband` → everywhere except Windows **static** (port unsupported on
+      `windows & static`); on Windows it's added to the dynamic build only.
   - **Per-platform policy** (user-approved): a feature is enabled wherever it
     builds, not gated to the lowest common denominator. So Windows-ARM has the
     smallest set, and opencl is present on Linux/macOS but absent on Windows.
