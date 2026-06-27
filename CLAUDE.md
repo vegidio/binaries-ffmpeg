@@ -96,6 +96,9 @@ Artifact/zip naming (kept identical to avif): `static_<os>_<arch>.zip` /
   package change needed. vcpkg prints the exact missing program/package on
   failure — expand the install list from the error.
 - `arm64-mingw` (Windows ARM) is the least-tested FFmpeg target; its curated list
-  is the smallest (no ssh/opengl/nvcodec/qsv/x264/x265).
+  is the smallest (no ssh/opengl/nvcodec/qsv/x264/x265/vpx/zmq). The Windows action
+  also **patches the vcpkg ffmpeg portfile** to add `--target-os=mingw64` for arm64
+  — the port only sets it for x86/x64, so without the patch FFmpeg's configure
+  misdetects the OS as `msys` and dies ("Native MSYS builds are discouraged").
 - The `actions/cache@v4` vcpkg binary cache makes cold builds (which compile
   x264/x265/aom/etc.) tolerable on re-runs.
