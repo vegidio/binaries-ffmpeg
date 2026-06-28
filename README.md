@@ -10,6 +10,12 @@ x64 & arm64 for macOS, Linux and Windows, built with Clang (macOS), GCC/Clang (L
 
 Built from [vcpkg](https://vcpkg.io), pinned to release `2026.06.24` (**FFmpeg 8.1.2**). Only **Release** binaries are produced (Debug is skipped).
 
+## Binary size & debug stripping
+
+Static libraries are **stripped of debug information** before packaging. By default the upstream builds embed debug symbols directly into the static libraries — DWARF (`.debug_*` / `__debug_*`) on Linux/macOS/MinGW, and CodeView (via MSVC's `/Z7`) on Windows. That debug data is *not* needed to link against the libraries, yet it dominated the archive size: it was ~90% of every static library, making the static archives 4–6× larger than necessary (the MSVC `static_windows_*` archives were the worst, ~280 MB).
+
+The build now removes it post-build with `strip --strip-debug` (Linux/MinGW), `strip -S` (macOS) and `llvm-objcopy --strip-debug` (Windows-MSVC). Only debug sections are removed — the symbol table is kept, so the libraries link exactly as before. The **dynamic** libraries (`.so`/`.dylib`/`.dll`) were already linker-stripped and are unaffected.
+
 ## License
 
 The binaries are licensed under **GPLv3** (FFmpeg under GPLv3 via `--enable-version3`, combined with OpenSSL 3.x / Apache-2.0).

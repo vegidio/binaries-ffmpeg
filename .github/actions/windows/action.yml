@@ -32,6 +32,10 @@ runs:
         & ./builder/bootstrap-vcpkg.bat
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         # Build only Release (skip Debug) for every triplet to roughly halve build time.
+        # (vcpkg's windows.cmake hardcodes /Z7 in the release flags, embedding CodeView
+        # debug info into every .obj/.lib — ~90% of the static .lib size. We can't strip
+        # it at compile time: overriding /Z7 with /Zi races on a shared PDB and breaks
+        # parallel autotools ports like gperf. Instead it's stripped post-build below.)
         Get-ChildItem -Path builder/triplets -Recurse -Filter *.cmake | ForEach-Object {
           Add-Content -Path $_.FullName -Value "`nset(VCPKG_BUILD_TYPE release)"
         }
@@ -82,6 +86,37 @@ runs:
         Copy-Item -Recurse -Force "$dy/include" "dynamic_${{ inputs.arch }}/include"
         Copy-Item -Force "$dy/bin/*.dll" "dynamic_${{ inputs.arch }}/lib/"
         Copy-Item -Force "$dy/lib/*.lib" "dynamic_${{ inputs.arch }}/lib/"
+
+    - name: Strip debug info from libs
+      shell: pwsh
+      run: |
+        # Strip the /Z7-embedded CodeView debug info (the .debug$S/.debug$T COFF
+        # sections) from the static .lib files — it's ~90% of their size and isn't
+        # needed to link against them. --strip-debug removes only debug sections,
+        # keeping the symbol table so the libraries still link. Done post-build so it
+        # can't break compilation. Only the static set is stripped: the dynamic set's
+        # import libraries (short-import members) would trip up llvm-objcopy and aren't
+        # bloated anyway.
+        $objcopy = (Get-Command llvm-objcopy -ErrorAction SilentlyContinue).Source
+        if (-not $objcopy) { $objcopy = "C:\Program Files\LLVM\bin\llvm-objcopy.exe" }
+        if (-not (Test-Path $objcopy)) { choco install llvm -y; $objcopy = "C:\Program Files\LLVM\bin\llvm-objcopy.exe" }
+        # Some MSVC libs carry members llvm-objcopy can't parse (e.g. LTCG/anonymous
+        # objects -> "unsupported object file format"). Don't abort on those: strip to
+        # a temp file and swap in only on success, otherwise skip (the lib stays
+        # unstripped but still links).
+        $ErrorActionPreference = "Continue"
+        $PSNativeCommandUseErrorActionPreference = $false
+        Get-ChildItem "static_${{ inputs.arch }}/lib" -Filter *.lib | ForEach-Object {
+          $src = $_.FullName; $tmp = "$src.stripped"
+          & $objcopy --strip-debug $src $tmp 2>$null
+          if ($LASTEXITCODE -eq 0 -and (Test-Path $tmp)) {
+            Move-Item -Force $tmp $src
+          } else {
+            if (Test-Path $tmp) { Remove-Item -Force $tmp }
+            Write-Host "skip (unsupported by llvm-objcopy): $($_.Name)"
+          }
+        }
+        exit 0
 
     - name: Zip local
       shell: pwsh

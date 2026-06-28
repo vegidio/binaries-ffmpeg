@@ -112,6 +112,10 @@ runs:
         # Bundle the from-source static VA-API stack (libva.a/libva-drm.a/libdrm.a)
         # so the consumer resolves FFmpeg's va*/drm* refs with nothing on the system.
         cp $GITHUB_WORKSPACE/valibs/lib/libva.a $GITHUB_WORKSPACE/valibs/lib/libva-drm.a $GITHUB_WORKSPACE/valibs/lib/libdrm.a $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib/
+        # Strip DWARF debug info from the static .a files (it's ~90% of their size
+        # and is not needed to link against them). --strip-debug keeps the symbol
+        # table, so the libraries still link; native strip matches the runner arch.
+        strip --strip-debug $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib/*.a
 
         cp -r $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}-dynamic/include $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/include
         cp -a $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}-dynamic/lib/*.so* $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/lib/

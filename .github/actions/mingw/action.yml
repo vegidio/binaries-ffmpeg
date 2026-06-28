@@ -108,6 +108,15 @@ runs:
           cp "$file" "$GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/lib/"
         done
 
+    - name: Strip debug info
+      shell: msys2 {0}
+      run: |
+        # Strip DWARF debug info from the static .a files (it's ~90% of their size
+        # and is not needed to link against them). Run under MSYS2 so the toolchain
+        # strip matches the target (GNU strip on MINGW64, llvm-strip on CLANGARM64);
+        # --strip-debug keeps the symbol table, so the libraries still link.
+        strip --strip-debug "$GITHUB_WORKSPACE"/static_${{ inputs.arch }}/lib/*.a
+
     - name: Zip local
       shell: bash
       run: |

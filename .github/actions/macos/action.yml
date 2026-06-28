@@ -59,6 +59,10 @@ runs:
       run: |
         cp -r $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}/include $GITHUB_WORKSPACE/static_${{ inputs.arch }}/include
         cp $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}/lib/*.a $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib
+        # Strip DWARF debug info from the static .a files (it's ~90% of their size
+        # and is not needed to link against them). -S removes debug symbols while
+        # keeping the symbol table, so the libraries still link.
+        strip -S $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib/*.a
 
         cp -r $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}-dynamic/include $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/include
         cp -a $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}-dynamic/lib/*.dylib $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/lib
