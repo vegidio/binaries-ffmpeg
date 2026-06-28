@@ -1,0 +1,124 @@
+name: "mingw"
+
+# Pinned upstream versions — bump these to upgrade.
+# vcpkg release tag: 2026.06.24 (FFmpeg 8.1.2)
+
+inputs:
+  arch:
+    description: "Target architecture suffix (e.g. x64, arm64)"
+    required: true
+  msystem:
+    description: "MSYS2 environment (e.g. MINGW64, CLANGARM64)"
+    required: true
+  packages:
+    description: "MSYS2 packages to install (newline-separated)"
+    required: true
+  triplet-prefix:
+    description: "vcpkg triplet prefix (e.g. x64-mingw); -static and -dynamic are derived from it"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install NASM
+      uses: ilammy/setup-nasm@v1
+
+    - name: Install MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: ${{ inputs.msystem }}
+        update: true
+        install: ${{ inputs.packages }}
+
+    - name: Cache vcpkg binaries
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/vcpkg_cache
+        key: vcpkg-${{ runner.os }}-${{ inputs.triplet-prefix }}-2026.06.24
+
+    - name: Install vcpkg
+      shell: bash
+      run: |
+        mkdir -p $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib
+        mkdir -p $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/lib
+        mkdir -p $GITHUB_WORKSPACE/vcpkg_cache
+        git clone --depth 1 --branch 2026.06.24 https://github.com/microsoft/vcpkg builder
+        ./builder/bootstrap-vcpkg.sh
+        # The ffmpeg port sets --target-os only for x86/x64 MinGW, omitting arm64.
+        # Without it, FFmpeg's configure misdetects the OS as "msys" and dies
+        # ("Native MSYS builds are discouraged"). Add the missing arm64 branch.
+        sed -i '/--target-os=mingw64")/a\elseif(VCPKG_TARGET_ARCHITECTURE STREQUAL "arm64")\nstring(APPEND OPTIONS " --target-os=mingw64")' builder/ports/ffmpeg/portfile.cmake
+        # Build only Release (skip Debug) for every triplet to roughly halve build time.
+        find builder/triplets -name '*.cmake' -exec bash -c 'echo "set(VCPKG_BUILD_TYPE release)" >> "$1"' _ {} \;
+        # libvpx cannot build as a shared library on MinGW ("--enable-shared only
+        # supported on ELF, OS/2, and Darwin"), so force it to static linkage even
+        # in the dynamic triplet (it gets statically linked into the FFmpeg DLLs).
+        find builder/triplets -name '*.cmake' -exec bash -c 'printf "\nif(PORT STREQUAL \"libvpx\")\n    set(VCPKG_LIBRARY_LINKAGE static)\nendif()\n" >> "$1"' _ {} \;
+
+    - name: Build FFmpeg
+      shell: msys2 {0}
+      env:
+        MSYS2_PATH_TYPE: inherit
+        VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
+      run: |
+        # Curated feature list (the all-gpl meta-feature pulls ports that cannot
+        # build across all triplets: tensorflow, tesseract, modplug, openmpt).
+        # Windows-ARM drops ssh/opengl/nvcodec/qsv/x264/x265 (unsupported there);
+        # avisynthplus is only valid on windows-x64-dynamic.
+        # OpenCL fix for Windows: FFmpeg's configure links it with `-lOpenCL`, but
+        # vcpkg's ICD loader installs it on Windows as OpenCL.a / OpenCL.dll.a
+        # (Windows naming, without the `lib` prefix MinGW's linker needs). So we
+        # pre-install opencl and add a libOpenCL.* alias before building FFmpeg.
+        alias_opencl() {
+          d="$GITHUB_WORKSPACE/builder/installed/$1/lib"
+          [ -f "$d/OpenCL.a" ] && cp -n "$d/OpenCL.a" "$d/libOpenCL.a" || true
+          [ -f "$d/OpenCL.dll.a" ] && cp -n "$d/OpenCL.dll.a" "$d/libOpenCL.dll.a" || true
+        }
+        ./builder/vcpkg install "opencl:${{ inputs.triplet-prefix }}-static" "opencl:${{ inputs.triplet-prefix }}-dynamic"
+        alias_opencl "${{ inputs.triplet-prefix }}-static"
+        alias_opencl "${{ inputs.triplet-prefix }}-dynamic"
+
+        # rubberband is omitted: its vcpkg port (v4.0.0) fails to compile with
+        # modern compilers ("unknown type name 'size_t'").
+        BASE="gpl,sdl2,aom,avcodec,avdevice,avfilter,avformat,bzip2,freetype,iconv,lzma,mp3lame,openjpeg,opus,snappy,soxr,speex,swresample,swscale,theora,twolame,vorbis,vpx,vulkan,webp,xml2,zlib,openssl,opencl,drawtext,zmq,dvdvideo,ass,fontconfig,fribidi,openh264,srt,dav1d,ilbc"
+        if [ "${{ inputs.arch }}" = "x64" ]; then
+          STATIC="$BASE,ssh,amf,opengl,nvcodec,qsv,x264,x265"
+          DYNAMIC="$STATIC,avisynthplus"
+        else
+          # Windows-ARM: libvpx, x264/x265, opengl, nvcodec, qsv, ssh are unsupported,
+          # and zeromq (zmq) fails to compile on arm64 — so this is the smallest set.
+          ARM_BASE="${BASE/,vpx/}"
+          ARM_BASE="${ARM_BASE/,zmq/}"
+          STATIC="$ARM_BASE,amf"
+          DYNAMIC="$STATIC"
+        fi
+        ./builder/vcpkg install "ffmpeg[$STATIC]:${{ inputs.triplet-prefix }}-static"
+        ./builder/vcpkg install "ffmpeg[$DYNAMIC]:${{ inputs.triplet-prefix }}-dynamic"
+
+    - name: Prepare binaries
+      shell: bash
+      run: |
+        cp -r $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet-prefix }}-static/include $GITHUB_WORKSPACE/static_${{ inputs.arch }}/
+        for file in "$GITHUB_WORKSPACE"/builder/installed/${{ inputs.triplet-prefix }}-static/lib/*.a; do
+          cp "$file" "$GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib/"
+        done
+
+        cp -r $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet-prefix }}-dynamic/include $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/
+        for file in "$GITHUB_WORKSPACE"/builder/installed/${{ inputs.triplet-prefix }}-dynamic/bin/*.dll; do
+          cp "$file" "$GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/lib/"
+        done
+
+    - name: Zip local
+      shell: bash
+      run: |
+        cd $GITHUB_WORKSPACE/static_${{ inputs.arch }}
+        7z a -tzip -mx=9 $GITHUB_WORKSPACE/static_mingw_${{ inputs.arch }}.zip include lib
+
+        cd $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}
+        7z a -tzip -mx=9 $GITHUB_WORKSPACE/dynamic_mingw_${{ inputs.arch }}.zip include lib
+
+    - name: Save artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: binaries-mingw-${{ inputs.arch }}
+        path: "*.zip"

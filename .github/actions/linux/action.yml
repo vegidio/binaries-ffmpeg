@@ -18,7 +18,12 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y nasm yasm pkg-config autoconf autoconf-archive automake libtool libltdl-dev libdrm-dev libgl1-mesa-dev libva-dev
+        # libva-dev is intentionally NOT installed: vcpkg builds its own static
+        # libva (2.23, has vaMapBuffer2) and we bundle it. A system libva-dev
+        # (Ubuntu 24.04 ships 2.20) would shadow it via pkg-config and reintroduce
+        # the vaMapBuffer2 undefined-reference. libdrm-dev stays (vcpkg's libva
+        # needs the DRM headers); meson/ninja build the static libdrm.a we bundle.
+        sudo apt-get install -y nasm yasm pkg-config autoconf autoconf-archive automake libtool libltdl-dev libdrm-dev libgl1-mesa-dev meson ninja-build
         mkdir -p $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib
         mkdir -p $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/lib
         mkdir -p $GITHUB_WORKSPACE/vcpkg_cache
@@ -58,11 +63,55 @@ runs:
         ./builder/vcpkg install "ffmpeg[$FEATURES]:${{ inputs.triplet }}"
         ./builder/vcpkg install "ffmpeg[$FEATURES]:${{ inputs.triplet }}-dynamic"
 
+    - name: Build static libva + libdrm
+      shell: bash
+      run: |
+        # vcpkg does NOT leave a static libva.a to bundle (and libdrm isn't a vcpkg
+        # port at all), so FFmpeg's static .a files would have dangling va*/drm*
+        # refs. Build both from source as static into a private prefix and bundle
+        # them. FFmpeg's .a only records UNVERSIONED undefined symbols, so a
+        # from-source libva of the SAME version FFmpeg compiled against resolves
+        # them in the consumer's --start-group. Pin libva to vcpkg's libva version
+        # (2.23.0); bump both together with vcpkg on upgrades.
+        DRM_VERSION=2.4.124
+        VA_VERSION=2.23.0
+        PREFIX=$GITHUB_WORKSPACE/valibs
+
+        # libdrm (core only; not a vcpkg port)
+        curl -fsSL "https://dri.freedesktop.org/libdrm/libdrm-${DRM_VERSION}.tar.xz" -o /tmp/libdrm.tar.xz
+        mkdir -p /tmp/libdrm-src
+        tar -xf /tmp/libdrm.tar.xz -C /tmp/libdrm-src --strip-components=1
+        meson setup /tmp/libdrm-src/build /tmp/libdrm-src \
+          --prefix="$PREFIX" --libdir=lib --buildtype=release --default-library=static \
+          -Dintel=disabled -Dradeon=disabled -Damdgpu=disabled -Dnouveau=disabled \
+          -Dvmwgfx=disabled -Detnaviv=disabled -Dfreedreno=disabled -Dvc4=disabled \
+          -Domap=disabled -Dexynos=disabled -Dtegra=disabled -Dvalgrind=disabled \
+          -Dman-pages=disabled -Dtests=false
+        ninja -C /tmp/libdrm-src/build install
+
+        # libva (+ libva-drm); finds our static libdrm via PKG_CONFIG_PATH.
+        # va/meson.build hard-codes shared_library() (ignoring --default-library),
+        # so it would only emit libva.so. Rewrite those to meson's library()
+        # wrapper, which honors --default-library=static while still accepting the
+        # shared-only version/soversion/vs_module_defs kwargs. This is why vcpkg's
+        # libva also never produced a static libva.a.
+        curl -fsSL "https://github.com/intel/libva/archive/refs/tags/${VA_VERSION}.tar.gz" -o /tmp/libva.tar.gz
+        mkdir -p /tmp/libva-src
+        tar -xf /tmp/libva.tar.gz -C /tmp/libva-src --strip-components=1
+        sed -i 's/shared_library(/library(/g' /tmp/libva-src/va/meson.build
+        PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" meson setup /tmp/libva-src/build /tmp/libva-src \
+          --prefix="$PREFIX" --libdir=lib --buildtype=release --default-library=static \
+          -Dwith_x11=no -Dwith_wayland=no -Dwith_glx=no
+        ninja -C /tmp/libva-src/build install
+
     - name: Prepare binaries
       shell: bash
       run: |
         cp -r $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}/include $GITHUB_WORKSPACE/static_${{ inputs.arch }}/include
         cp $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}/lib/*.a $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib/
+        # Bundle the from-source static VA-API stack (libva.a/libva-drm.a/libdrm.a)
+        # so the consumer resolves FFmpeg's va*/drm* refs with nothing on the system.
+        cp $GITHUB_WORKSPACE/valibs/lib/libva.a $GITHUB_WORKSPACE/valibs/lib/libva-drm.a $GITHUB_WORKSPACE/valibs/lib/libdrm.a $GITHUB_WORKSPACE/static_${{ inputs.arch }}/lib/
 
         cp -r $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}-dynamic/include $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/include
         cp -a $GITHUB_WORKSPACE/builder/installed/${{ inputs.triplet }}-dynamic/lib/*.so* $GITHUB_WORKSPACE/dynamic_${{ inputs.arch }}/lib/
