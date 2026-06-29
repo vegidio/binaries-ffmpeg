@@ -12,13 +12,9 @@ Built from [vcpkg](https://vcpkg.io), pinned to release `2026.06.24` (**FFmpeg 8
 
 ## Binary size & debug stripping
 
-Static libraries are **stripped of debug information** before packaging. By default the upstream builds embed debug symbols directly into the static libraries — DWARF (`.debug_*` / `__debug_*`) on Linux/macOS/MinGW, and CodeView (via MSVC's `/Z7`) on Windows. That debug data is *not* needed to link against the libraries, yet it dominated the archive size: it was ~90% of every static library, making the static archives 4–6× larger than necessary (the MSVC `static_windows_*` archives were the worst, ~280 MB).
+Static libraries are **stripped of debug information** before packaging. By default, the upstream builds embed debug symbols directly into the static libraries — DWARF (`.debug_*` / `__debug_*`) on Linux/macOS/MinGW, and CodeView (via MSVC's `/Z7`) on Windows. That debug data is *not* needed to link against the libraries.
 
-The build now removes it post-build with `strip --strip-debug` (Linux/MinGW), `strip -S` (macOS) and `llvm-objcopy --strip-debug` (Windows-MSVC). Only debug sections are removed — the symbol table is kept, so the libraries link exactly as before. The **dynamic** libraries (`.so`/`.dylib`/`.dll`) were already linker-stripped and are unaffected.
-
-## License
-
-The binaries are licensed under **GPLv3** (FFmpeg under GPLv3 via `--enable-version3`, combined with OpenSSL 3.x / Apache-2.0).
+The build removes it post-build with `strip --strip-debug` (Linux/MinGW), `strip -S` (macOS) and `llvm-objcopy --strip-debug` (Windows-MSVC). Only debug sections are removed — the symbol table is kept, so the libraries link exactly as before. The **dynamic** libraries (`.so`/`.dylib`/`.dll`) were already linker-stripped and are unaffected.
 
 ## Feature matrix
 
@@ -111,6 +107,10 @@ Legend: ✅ available · ❌ not available. Columns are `OS-arch`.
 | `ffmpeg` / `ffplay` / `ffprobe` apps | Only libraries are produced.                                                                                             |
 
 > Dropping `modplug` + `openmpt` means there is **no tracker-module (MOD/XM/IT/S3M) decoding** in these builds.
+
+## 📝 License
+
+This version of **FFmpeg** is released under the GPLv3 License. See [LICENSE](LICENSE) for details.
 
 ## 👨🏾‍💻 Author
 
